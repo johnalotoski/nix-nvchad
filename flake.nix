@@ -13,6 +13,8 @@
       url = "github:NvChad/starter";
       flake = false;
     };
+
+    tree-sitter.url = "github:tree-sitter/tree-sitter/v0.26.3";
   };
 
   outputs = {self, ...}:
@@ -321,10 +323,9 @@
           ripgrep
           fd
 
-          # Enable compiling additions language grammars on demand from source life
+          # Enable compiling additional language grammars on demand from source file.
           # The tree-sitter version will need to be compatible with the lazy-lock.json pin.
-          tree-sitter
-
+          self.inputs.tree-sitter.packages.${system}.cli
         ];
         text = ''
           [ -n "''${DEBUG:-}" ] && set -x
