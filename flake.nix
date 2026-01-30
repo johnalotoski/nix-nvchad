@@ -189,11 +189,12 @@
 
     # For advanced custom lua config
     initCustom = pkgs.writeText "init-custom.lua" ''
-      print("DEBUG: custom/init.lua is loading!")
-
-      print("DEBUG: end")
+      -- print("DEBUG: custom/init.lua is loading!")
+      -- DEBUG HERE
+      -- print("DEBUG: end")
     '';
 
+    # Lazy can't lock itself with its own lock file
     lazyLock = builtins.toFile "lazy-lock.json" ''
       {
         "LuaSnip": { "branch": "master", "commit": "dae4f5aaa3574bd0c2b9dd20fb9542a02c10471c" },
@@ -204,7 +205,6 @@
         "friendly-snippets": { "branch": "main", "commit": "6cd7280adead7f586db6fccbd15d2cac7e2188b9" },
         "gitsigns.nvim": { "branch": "main", "commit": "abf82a65f185bd54adc0679f74b7d6e1ada690c9" },
         "indent-blankline.nvim": { "branch": "master", "commit": "005b56001b2cb30bfa61b7986bc50657816ba4ba" },
-        "lazy.nvim": { "branch": "main", "commit": "306a05526ada86a7b30af95c5cc81ffba93fef97" },
         "mason.nvim": { "branch": "main", "commit": "44d1e90e1f66e077268191e3ee9d2ac97cc18e65" },
         "menu": { "branch": "main", "commit": "7a0a4a2896b715c066cfbe320bdc048091874cc6" },
         "minty": { "branch": "main", "commit": "aafc9e8e0afe6bf57580858a2849578d8d8db9e0" },
