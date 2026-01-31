@@ -17,16 +17,30 @@
     tree-sitter.url = "github:tree-sitter/tree-sitter/v0.26.3";
   };
 
-  outputs = {self, ...}:
+  outputs = {self, nixpkgs, ...}:
   let
-    inherit (pkgs) lib;
-
     system = "x86_64-linux";
+
+    # Define our custom overlay
+    myOverlay = final: prev: {
+      neovim-unwrapped = prev.neovim-unwrapped.overrideAttrs (oldAttrs: {
+        postInstall = (oldAttrs.postInstall or "") + ''
+          echo "Removing lib/nvim/parser from neovim output to avoid treesitter conflicts..."
+          rm -rf $out/lib/nvim/parser || true
+        '';
+      });
+    };
+
+    # Apply the overlay to nixpkgs
+    pkgs = import nixpkgs {
+      inherit system;
+      overlays = [ myOverlay ];
+    };
+
+    inherit (pkgs) lib;
 
     mkPkgs = input:
       import self.inputs.${input} {inherit system;};
-
-    pkgs = mkPkgs "nixpkgs";
 
     autoCmds = builtins.toFile "autocmds.lua" ''
       require "nvchad.autocmds"
@@ -98,6 +112,7 @@
       }
 
       M.nvdash = { load_on_startup = true }
+
       -- M.ui = {
       --       tabufline = {
       --          lazyload = false
@@ -131,7 +146,14 @@
           branch = "v2.5",
           import = "nvchad.plugins",
         },
-
+        {
+          "folke/which-key.nvim",
+          lazy = false,
+        },
+        {
+          "nvim-treesitter/nvim-treesitter",
+          lazy = false,
+        },
         { import = "plugins" },
       }, lazy_config)
 
@@ -172,18 +194,15 @@
         -- test new blink
         { import = "nvchad.blink.lazyspec" },
 
-        -- {
-        --  "nvim-treesitter/nvim-treesitter",
-        --  opts = {
-        --    ensure_installed = {
-        --      "css",
-        --      "html",
-        --      "lua",
-        --      "vim",
-        --      "vimdoc",
-        --     },
-        --   },
-        -- },
+        {
+          "nvim-treesitter/nvim-treesitter",
+          opts = {
+            ensure_installed = {
+              "vim", "lua", "vimdoc",
+             "html", "css", "go", "nu"
+            },
+          },
+        },
       }
     '';
 
@@ -300,20 +319,18 @@
       statix                                   # Nix
     ];
   in {
-
-
-
     packages.${system} = rec {
       default = nix-nvchad;
+
+      neovim = pkgs.neovim;
 
       nix-nvchad = let
         appName = "nix-nvchad";
       in pkgs.writeShellApplication {
         name = appName;
 
-        # Keep the existing
         runtimeInputs = with pkgs; [
-          neovim
+          self.packages.${system}.neovim
 
           # Core tools for neovim plugins (telescope, treesitter, etc.)
           gcc
@@ -327,6 +344,7 @@
           # The tree-sitter version will need to be compatible with the lazy-lock.json pin.
           self.inputs.tree-sitter.packages.${system}.cli
         ];
+
         text = ''
           [ -n "''${DEBUG:-}" ] && set -x
 
@@ -379,7 +397,7 @@
             # And again
             chmod -R u+w "$CONFIG_DIR"
           fi
-          exec ${pkgs.neovim}/bin/nvim "$@"
+          exec nvim "$@"
         '';
       };
     };
