@@ -4,7 +4,8 @@
   # TODO
   # nerd-font
   # map init to source with append
-  # fix up treesitter
+  # grammar module
+  # lua debug module
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
@@ -21,7 +22,6 @@
   let
     system = "x86_64-linux";
 
-    # Define our custom overlay
     myOverlay = final: prev: {
       neovim-unwrapped = prev.neovim-unwrapped.overrideAttrs (oldAttrs: {
         postInstall = (oldAttrs.postInstall or "") + ''
@@ -31,7 +31,6 @@
       });
     };
 
-    # Apply the overlay to nixpkgs
     pkgs = import nixpkgs {
       inherit system;
       overlays = [ myOverlay ];
@@ -39,9 +38,7 @@
 
     inherit (pkgs) lib;
 
-    mkPkgs = input:
-      import self.inputs.${input} {inherit system;};
-
+    # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/autocmds.lua
     autoCmds = builtins.toFile "autocmds.lua" ''
       require "nvchad.autocmds"
 
@@ -94,6 +91,7 @@
       })
     '';
 
+    # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/chadrc.lua
     chadRc = builtins.toFile "chadrc.lua" ''
       -- This file needs to have same structure as nvconfig.lua
       -- https://github.com/NvChad/ui/blob/v3.0/lua/nvconfig.lua
@@ -122,6 +120,7 @@
       return M
     '';
 
+    # Upstream ref: https://github.com/NvChad/starter/blob/main/init.lua
     init = builtins.toFile "init.lua" ''
       vim.g.base46_cache = vim.fn.stdpath "data" .. "/base46/"
       vim.g.mapleader = " "
@@ -146,14 +145,28 @@
           branch = "v2.5",
           import = "nvchad.plugins",
         },
+
+        -- MOD: To enforce treesitter grammar install on startup
+        {
+          "nvim-treesitter/nvim-treesitter",
+          lazy = false,
+          build = ':lua require("nvim-treesitter").install({"css", "html", "lua", "vim", "vimdoc", "go", "nix", "nu", "query"})',
+          config = function()
+            require("nvim-treesitter").setup({
+              highlight = { enable = true },
+              auto_install = true,
+              install_dir = vim.fn.stdpath("data") .. "/site",
+            })
+          end
+        },
+
+        -- MOD: To avoid having to double-press the leader key on first invocation when lazy loaded
         {
           "folke/which-key.nvim",
           lazy = false,
         },
-        {
-          "nvim-treesitter/nvim-treesitter",
-          lazy = false,
-        },
+
+        -- Load other plugins
         { import = "plugins" },
       }, lazy_config)
 
@@ -168,13 +181,14 @@
         require "mappings"
       end)
 
-      pcall(require, "custom.init")
+      -- MOD: Any other custom initialization
+      require "custom.init"
     '';
 
+    # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/plugins/init.lua
+    #
     # See treesitter supported languages at:
     # https://github.com/nvim-treesitter/nvim-treesitter/blob/main/SUPPORTED_LANGUAGES.md
-    #
-    # or `TSInstall <tab>` to see a list
     initPlugins = builtins.toFile "init-plugins.lua" ''
       return {
         {
@@ -191,26 +205,25 @@
           end,
         },
 
-        -- test new blink
+        -- MOD: test new blink, enabled
         { import = "nvchad.blink.lazyspec" },
 
-        {
-          "nvim-treesitter/nvim-treesitter",
-          opts = {
-            ensure_installed = {
-              "vim", "lua", "vimdoc",
-             "html", "css", "go", "nu"
-            },
-          },
-        },
+        -- COMMENT: This doesn't work with the new nvim-treesitter API on main
+        -- See the alternate treesitter setup in init.lua and lua/custom/init.lua
+        -- {
+        --  "nvim-treesitter/nvim-treesitter",
+        --  opts = {
+        --    ensure_installed = {
+        --      "vim", "lua", "vimdoc",
+        --      "html", "css"
+        --    },
+        --  },
+        -- },
       }
     '';
 
-    # For advanced custom lua config
+    # For custom initialization
     initCustom = pkgs.writeText "init-custom.lua" ''
-      -- print("DEBUG: custom/init.lua is loading!")
-      -- DEBUG HERE
-      -- print("DEBUG: end")
     '';
 
     # Lazy can't lock itself with its own lock file
@@ -240,12 +253,19 @@
       }
     '';
 
+    # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/configs/lspconfig.lua
+    #
     # For available LSPs, view:
     # https://github.com/neovim/nvim-lspconfig/blob/master/doc/configs.md
     lspConfig = builtins.toFile "lspconfig.lua" ''
       require("nvchad.configs.lspconfig").defaults()
 
-      -- LSP servers available via Nix (no Mason needed)
+      -- LSP servers from either the nix-nvchad package or the environment
+      -- When LSP servers are either very large or not used frequently,
+      -- they will be expected from the project's env so as not to bloat
+      -- the base nix-nvchad package.  If an LSP is defined here, but
+      -- noted to be expected from the environment and is not provided,
+      -- expect LSP missing binary errors when opening a file of this type.
       local servers = {
         "bashls",         -- Bash
         "clangd",         -- C/C++
@@ -272,6 +292,7 @@
       -- read :h vim.lsp.config for changing options of lsp servers
     '';
 
+    # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/options.lua
     options = builtins.toFile "options.lua" ''
       require "nvchad.options"
 
@@ -329,26 +350,34 @@
       in pkgs.writeShellApplication {
         name = appName;
 
+        # Pass the parent environment path to neovim
+        inheritPath = true;
+
         runtimeInputs = with pkgs; [
           self.packages.${system}.neovim
 
           # Core tools for neovim plugins (telescope, treesitter, etc.)
+          coreutils
+          curl
+          fd
           gcc
           git
           gnumake
+          gnutar
+          gzip
           nodejs
           ripgrep
-          fd
 
           # Enable compiling additional language grammars on demand from source file.
           # The tree-sitter version will need to be compatible with the lazy-lock.json pin.
+          # Current main requires >= v0.26.1 tree-sitter cli.
           self.inputs.tree-sitter.packages.${system}.cli
         ];
 
         text = ''
           [ -n "''${DEBUG:-}" ] && set -x
 
-          # Runtime inputs paths and parent shell paths
+          # Runtime inputs paths and parent shell paths if inheritPath is true
           REQUIRED_PATHS="$PATH"
 
           # Fallback paths
@@ -361,42 +390,28 @@
           export NVIM_APPNAME=${appName}
 
           CONFIG_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/${appName}"
-          if [ ! -e "$CONFIG_DIR/init.lua" ]; then
+
+          if ! [ -e "$CONFIG_DIR/init.lua" ]; then
             mkdir -p "$CONFIG_DIR/lua/custom"
 
-            # Copy base nvchad config
+            # Copy upstream nvchad config
             cp -r ${self.inputs.nvchad-starter}/* "$CONFIG_DIR/"
 
-            # Some features such as theme toggling require writable config
+            # Explicitly overwrite upstream config with our custom files
             chmod -R u+w "$CONFIG_DIR"
-
-            # Copy autocmds
             cp ${autoCmds} "$CONFIG_DIR"/lua/autocmds.lua
-
-            # Copy chadrc
             cp ${chadRc} "$CONFIG_DIR"/lua/chadrc.lua
-
-            # Copy init
             cp ${init} "$CONFIG_DIR"/init.lua
-
-            # Copy custom init
             cp ${initCustom} "$CONFIG_DIR"/lua/custom/init.lua
-
-            # Copy plugins init
             cp ${initPlugins} "$CONFIG_DIR"/lua/plugins/init.lua
-
-            # Copy Lazy plugin lock file
             cp ${lazyLock} "$CONFIG_DIR"/lazy-lock.json
-
-            # Copy lspconfig
             cp ${lspConfig} "$CONFIG_DIR"/lua/configs/lspconfig.lua
-
-            # Copy options
             cp ${options} "$CONFIG_DIR"/lua/options.lua
 
-            # And again
+            # And again, ensure config is writable
             chmod -R u+w "$CONFIG_DIR"
           fi
+
           exec nvim "$@"
         '';
       };
@@ -404,8 +419,6 @@
 
     devShells.${system}.default = pkgs.mkShell {
       packages = [self.packages.${system}.default];
-      shellHook = ''
-      '';
     };
   };
 }
