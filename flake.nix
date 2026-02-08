@@ -20,9 +20,25 @@
     tree-sitter.url = "github:tree-sitter/tree-sitter/v0.26.3";
   };
 
-  outputs = inputs:
+  outputs = inputs: let
+    inherit (inputs.nixpkgs) lib;
+  in
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
       systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
+
+      flake = {
+        # Export lib.mkNixNvchad for downstream customization
+        lib = {
+          mkNixNvchad = {
+            pkgs,
+            system ? pkgs.system,
+            modules ? [],
+          }:
+            import ./lib/mkNixNvchad.nix {inherit inputs lib system;} {
+              inherit pkgs modules;
+            };
+        };
+      };
 
       perSystem = {
         inputs',
