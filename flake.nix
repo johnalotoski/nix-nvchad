@@ -55,7 +55,6 @@
       };
 
       perSystem = {
-        inputs',
         lib,
         pkgs,
         self',

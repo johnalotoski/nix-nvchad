@@ -333,12 +333,53 @@ in
       export NVIM_APPNAME=${appName}
 
       CONFIG_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/${appName}"
+      DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/${appName}"
+      STATE_DIR="''${XDG_STATE_HOME:-$HOME/.local/state}/${appName}"
 
+      # Check for custom flags
+      REINSTALL=false
+      UPDATE_CONFIG=false
+      ARGS=()
+      for ARG in "$@"; do
+        case "$ARG" in
+          --reinstall)
+            REINSTALL=true
+            ;;
+          --update-config)
+            UPDATE_CONFIG=true
+            ;;
+          *)
+            ARGS+=("$ARG")
+            ;;
+        esac
+      done
+
+      # Handle reinstall: purge all config/data/state and bootstrap fresh
+      if [ "$REINSTALL" = true ]; then
+        echo "Reinstalling ${appName} in 4 seconds..."
+        echo "Press CTRL-C to cancel..."
+        sleep 4
+        echo "Removing config: $CONFIG_DIR"
+        rm -rf "$CONFIG_DIR"
+        echo "Removing data: $DATA_DIR"
+        rm -rf "$DATA_DIR"
+        echo "Removing state: $STATE_DIR"
+        rm -rf "$STATE_DIR"
+      # Handle update-config: purge only config and bootstrap fresh
+      elif [ "$UPDATE_CONFIG" = true ]; then
+        echo "Updating config for ${appName} in 4 seconds..."
+        echo "Press CTRL-C to cancel..."
+        sleep 4
+        echo "Removing config: $CONFIG_DIR"
+        rm -rf "$CONFIG_DIR"
+      fi
+
+      # Bootstrap config if not present
       if ! [ -e "$CONFIG_DIR/init.lua" ]; then
         mkdir -p "$CONFIG_DIR/lua/custom"
 
         # Copy upstream nvchad config
-        cp -r ${inputs.nvchad-starter}/* "$CONFIG_DIR/"
+        cp -rv ${inputs.nvchad-starter}/* "$CONFIG_DIR/"
 
         # Explicitly overwrite upstream config with our custom files
         chmod -R u+w "$CONFIG_DIR"
@@ -355,6 +396,6 @@ in
         chmod -R u+w "$CONFIG_DIR"
       fi
 
-      exec nvim "$@"
+      exec nvim "''${ARGS[@]}"
     '';
   }
