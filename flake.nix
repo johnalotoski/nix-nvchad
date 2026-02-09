@@ -22,21 +22,35 @@
 
   outputs = inputs: let
     inherit (inputs.nixpkgs) lib;
+    systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
   in
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
-      systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
+      inherit systems;
 
       flake = {
         # Export lib.mkNixNvchad for downstream customization
         lib = {
           mkNixNvchad = {
             pkgs,
-            system ? pkgs.system,
+            system ? pkgs.stdenv.hostPlatform.system,
             modules ? [],
           }:
             import ./lib/mkNixNvchad.nix {inherit inputs lib system;} {
               inherit pkgs modules;
             };
+
+          # Per-system options accessor, for inspection @ options.${system}...
+          options = lib.genAttrs systems (system:
+            let
+              pkgs = import inputs.nixpkgs { inherit system; };
+              evaluated = lib.evalModules {
+                modules = [
+                  ./lib/options.nix
+                  { _module.args = { inherit pkgs; }; }
+                ];
+              };
+            in evaluated.options
+          );
         };
       };
 
