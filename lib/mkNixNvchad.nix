@@ -1,12 +1,14 @@
-# Build a customized nix-nvchad package using module options
+# Build a customized nix-nvchad package using module options.
+# This example includes neovim-nightly usage with fallbackInputs mods.
 #
 # Usage:
 #
 #   {
 #     inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 #     inputs.nix-nvchad.url = "github:johnalotoski/nix-nvchad";
+#     inputs.neovim-nightly.url = "github:nix-community/neovim-nightly-overlay";
 #
-#     outputs = { nixpkgs, nix-nvchad, ... }:
+#     outputs = { nixpkgs, nix-nvchad, neovim-nightly, ... }:
 #     let
 #       system = "x86_64-linux";
 #       pkgs = import nixpkgs { inherit system; };
@@ -15,13 +17,18 @@
 #         inherit pkgs;
 #         modules = [
 #           {
-#             fallbackInputs = with pkgs; [ gopls rust-analyzer nixd ];
+#             # Use the nix-community neovim-nightly package instead of the
+#             # default nixpkgs neovim-unwrapped.
+#             neovim = neovim-nightly.packages.${system}.neovim;
+#
+#             # This will merge hls into the default fallbackInputs.
+#             # Add a `mkForce` to override the list to exclusively hls.
+#             fallbackInputs = with pkgs; [ haskell-language-server ];
 #           }
 #         ];
 #       };
 #     };
 #   }
-#
 {
   inputs,
   lib,
@@ -50,5 +57,5 @@ let
 in
   import ../per-system/packages/nix-nvchad.nix {
     inherit inputs lib pkgs system;
-    inherit (cfg) fallbackInputs;
+    inherit (cfg) fallbackInputs neovim;
   }

@@ -4,7 +4,18 @@
   pkgs,
   system,
   fallbackInputs,
+  neovim,
 }: let
+  # Sanitize neovim by stripping treesitter parsers to avoid conflicts with lazy-managed parsers
+  neovim-sanitized = neovim.overrideAttrs (oldAttrs: {
+    postInstall =
+      (oldAttrs.postInstall or "")
+      + ''
+        echo "Removing lib/nvim/parser from neovim output to avoid treesitter conflicts..."
+        rm -rf $out/lib/nvim/parser || true
+      '';
+  });
+
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/autocmds.lua
   autoCmds = builtins.toFile "autocmds.lua" ''
     require "nvchad.autocmds"
@@ -287,7 +298,7 @@ in
     inheritPath = true;
 
     runtimeInputs = with pkgs; [
-      neovim
+      neovim-sanitized
 
       # Core tools for neovim plugins (telescope, treesitter, etc.)
       coreutils

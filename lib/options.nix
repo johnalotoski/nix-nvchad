@@ -5,7 +5,6 @@
 #   :lf .
 #   :p lib.options.${system}.$OPTION.description
 {
-  config,
   lib,
   pkgs,
   ...
@@ -63,6 +62,18 @@ in {
         will be merged with the default list at higher path priority.
 
         To override the default list of packages, use `mkForce` in the declaration.
+      '';
+    };
+
+    neovim = mkOption {
+      type = package;
+      default = pkgs.neovim-unwrapped;
+      description = ''
+        Base neovim package to use. This can be `pkgs.neovim-unwrapped` from nixpkgs
+        or an alternative like `neovim-nightly-overlay`'s unwrapped package.
+
+        The provided package will have treesitter parsers stripped from
+        `lib/nvim/parser` to avoid conflicts with lazy-managed parsers.
       '';
     };
   };

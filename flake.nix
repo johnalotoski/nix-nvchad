@@ -62,30 +62,14 @@
         system,
         ...
       }: let
-        nvim-sanitized = final: prev: {
-          neovim-unwrapped = prev.neovim-unwrapped.overrideAttrs (oldAttrs: {
-            postInstall =
-              (oldAttrs.postInstall or "")
-              + ''
-                echo "Removing lib/nvim/parser from neovim output to avoid treesitter conflicts..."
-                rm -rf $out/lib/nvim/parser || true
-              '';
-          });
-        };
-
-        customPkgs = import inputs.nixpkgs {
-          inherit system;
-          overlays = [nvim-sanitized];
-        };
-
         evaluated = lib.evalModules {
           modules = [
             ./lib/options.nix
-            {_module.args = {pkgs = customPkgs;};}
+            {_module.args = {inherit pkgs;};}
           ];
         };
 
-        optionsDoc = customPkgs.nixosOptionsDoc {
+        optionsDoc = pkgs.nixosOptionsDoc {
           options = evaluated.options;
           transformOptions = opt: opt // {
             declarations = [];
@@ -94,8 +78,7 @@
 
         packages =
           import ./per-system/packages {
-            inherit inputs lib system;
-            pkgs = customPkgs;
+            inherit inputs lib pkgs system;
           }
           // {
             docs-md = optionsDoc.optionsCommonMark;
@@ -104,7 +87,7 @@
       in {
         inherit packages;
 
-        devShells.default = customPkgs.mkShell {
+        devShells.default = pkgs.mkShell {
           packages = [self'.packages.default];
         };
       };
