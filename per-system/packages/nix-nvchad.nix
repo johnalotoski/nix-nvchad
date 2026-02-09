@@ -287,11 +287,9 @@
     opt.shiftwidth = 2
     opt.tabstop = 2
   '';
-
-  appName = "nix-nvchad";
 in
   pkgs.writeShellApplication {
-    name = appName;
+    name = cfg.appName;
 
     # Pass the parent environment path to neovim
     inheritPath = true;
@@ -330,11 +328,11 @@ in
       export PATH="$REQUIRED_PATHS:$FALLBACK_PATHS"
 
       # Export the nvim namespacing
-      export NVIM_APPNAME=${appName}
+      export NVIM_APPNAME=${cfg.appName}
 
-      CONFIG_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/${appName}"
-      DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/${appName}"
-      STATE_DIR="''${XDG_STATE_HOME:-$HOME/.local/state}/${appName}"
+      CONFIG_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/${cfg.appName}"
+      DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/${cfg.appName}"
+      STATE_DIR="''${XDG_STATE_HOME:-$HOME/.local/state}/${cfg.appName}"
 
       # Check for custom flags
       REINSTALL=false
@@ -356,7 +354,7 @@ in
 
       # Handle reinstall: purge all config/data/state and bootstrap fresh
       if [ "$REINSTALL" = true ]; then
-        echo "Reinstalling ${appName} in 4 seconds..."
+        echo "Reinstalling ${cfg.appName} in 4 seconds..."
         echo "Press CTRL-C to cancel..."
         sleep 4
         echo "Removing config: $CONFIG_DIR"
@@ -367,7 +365,7 @@ in
         rm -rf "$STATE_DIR"
       # Handle update-config: purge only config and bootstrap fresh
       elif [ "$UPDATE_CONFIG" = true ]; then
-        echo "Updating config for ${appName} in 4 seconds..."
+        echo "Updating config for ${cfg.appName} in 4 seconds..."
         echo "Press CTRL-C to cancel..."
         sleep 4
         echo "Removing config: $CONFIG_DIR"

@@ -11,7 +11,7 @@
 }: let
   inherit (builtins) sort;
   inherit (lib) concatStringsSep mkAfter mkOption types unique;
-  inherit (types) listOf package;
+  inherit (types) listOf package str;
 
   fallbackInputs = with pkgs; [
     # LSP servers
@@ -43,6 +43,15 @@
   ];
 in {
   options = {
+    appName = mkOption {
+      type = str;
+      default = "nix-nvchad";
+      description = ''
+        Application name used for the binary name, NVIM_APPNAME, and XDG directory paths.
+        This allows creating multiple distinct nix-nvchad configurations with different names.
+      '';
+    };
+
     fallbackInputs = mkOption {
       type = listOf package;
       default = [];
