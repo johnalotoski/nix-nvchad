@@ -78,10 +78,29 @@
           overlays = [nvim-sanitized];
         };
 
-        packages = import ./per-system/packages {
-          inherit inputs lib system;
-          pkgs = customPkgs;
+        evaluated = lib.evalModules {
+          modules = [
+            ./lib/options.nix
+            {_module.args = {pkgs = customPkgs;};}
+          ];
         };
+
+        optionsDoc = customPkgs.nixosOptionsDoc {
+          options = evaluated.options;
+          transformOptions = opt: opt // {
+            declarations = [];
+          };
+        };
+
+        packages =
+          import ./per-system/packages {
+            inherit inputs lib system;
+            pkgs = customPkgs;
+          }
+          // {
+            docs-md = optionsDoc.optionsCommonMark;
+            docs-json = optionsDoc.optionsJSON;
+          };
       in {
         inherit packages;
 

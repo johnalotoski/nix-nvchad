@@ -55,7 +55,9 @@ in {
 
         A relatively lightweight default set is included, consisting of:
 
+        ```
         ${concatStringsSep "\n" (sort (a: b: a < b) (map (p: p.name) fallbackInputs))}
+        ```
 
         To add to the default list of packages, simply declare more and they
         will be merged with the default list at higher path priority.
