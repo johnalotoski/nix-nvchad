@@ -41,6 +41,18 @@
     shellcheck                               # Shell
     statix                                   # Nix
   ];
+
+  grammars = [
+    "css"
+    "html"
+    "lua"
+    "vim"
+    "vimdoc"
+    "go"
+    "nix"
+    "nu"
+    "query"
+  ];
 in {
   options = {
     appName = mkOption {
@@ -85,9 +97,37 @@ in {
         `lib/nvim/parser` to avoid conflicts with lazy-managed parsers.
       '';
     };
+
+    grammars = mkOption {
+      type = listOf str;
+      default = [];
+      apply = unique;
+      description = ''
+        List of nvim-treesitter grammars to include.  The list elements must
+        consist of supported treesitter grammars.  Such a list can be found at:
+
+        <https://github.com/nvim-treesitter/nvim-treesitter/blob/main/SUPPORTED_LANGUAGES.md>
+
+        A small default set is included, consisting of:
+
+        ```
+        ${concatStringsSep "\n" (sort (a: b: a < b) grammars)}
+        ```
+
+        To add to the default list of grammars, simply declare more and they
+        will be merged with the default list.
+
+        To override the default list of grammar, use `mkForce` in the
+        declaration.
+
+        If the "all" grammar is found in the list, all available grammars will
+        be installed.
+      '';
+    };
   };
 
   config = {
     fallbackInputs = mkAfter fallbackInputs;
+    grammars = mkAfter grammars;
   };
 }

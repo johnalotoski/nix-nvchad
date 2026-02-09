@@ -5,6 +5,9 @@
   system,
   cfg,
 }: let
+  inherit (builtins) elem;
+  inherit (lib) concatMapStringsSep;
+
   # Sanitize neovim by stripping treesitter parsers to avoid conflicts with lazy-managed parsers
   neovim-sanitized = cfg.neovim.overrideAttrs (oldAttrs: {
     postInstall =
@@ -98,7 +101,13 @@
   '';
 
   # Upstream ref: https://github.com/NvChad/starter/blob/main/init.lua
-  init = builtins.toFile "init.lua" ''
+  init = let
+    # Grammar install command for config function (runs on each startup)
+    treesitterInstall =
+      if elem "all" cfg.grammars
+      then ''vim.cmd("TSInstall all")''
+      else ''require("nvim-treesitter").install({${concatMapStringsSep ", " (g: ''"${g}"'') cfg.grammars}})'';
+  in builtins.toFile "init.lua" ''
     vim.g.base46_cache = vim.fn.stdpath "data" .. "/base46/"
     vim.g.mapleader = " "
 
@@ -127,13 +136,14 @@
       {
         "nvim-treesitter/nvim-treesitter",
         lazy = false,
-        build = ':lua require("nvim-treesitter").install({"css", "html", "lua", "vim", "vimdoc", "go", "nix", "nu", "query"})',
         config = function()
           require("nvim-treesitter").setup({
             highlight = { enable = true },
             auto_install = true,
             install_dir = vim.fn.stdpath("data") .. "/site",
           })
+          -- Ensure configured grammars are installed on each startup
+          ${treesitterInstall}
         end
       },
 
@@ -336,15 +346,19 @@ in
 
       # Check for custom flags
       REINSTALL=false
-      UPDATE_CONFIG=false
+      REINSTALL_CONFIG=false
+      REINSTALL_DATA=false
       ARGS=()
       for ARG in "$@"; do
         case "$ARG" in
           --reinstall)
             REINSTALL=true
             ;;
-          --update-config)
-            UPDATE_CONFIG=true
+          --reinstall-config)
+            REINSTALL_CONFIG=true
+            ;;
+          --reinstall-data)
+            REINSTALL_DATA=true
             ;;
           *)
             ARGS+=("$ARG")
@@ -363,13 +377,25 @@ in
         rm -rf "$DATA_DIR"
         echo "Removing state: $STATE_DIR"
         rm -rf "$STATE_DIR"
-      # Handle update-config: purge only config and bootstrap fresh
-      elif [ "$UPDATE_CONFIG" = true ]; then
-        echo "Updating config for ${cfg.appName} in 4 seconds..."
-        echo "Press CTRL-C to cancel..."
-        sleep 4
-        echo "Removing config: $CONFIG_DIR"
-        rm -rf "$CONFIG_DIR"
+      else
+        # Handle reinstall-config: purge only config and bootstrap fresh
+        if [ "$REINSTALL_CONFIG" = true ]; then
+          echo "Reinstalling config for ${cfg.appName} in 4 seconds..."
+          echo "Press CTRL-C to cancel..."
+          sleep 4
+          echo "Removing config: $CONFIG_DIR"
+          rm -rf "$CONFIG_DIR"
+          echo
+        fi
+
+        # Handle reinstall-data: purge only data (plugins, parsers)
+        if [ "$REINSTALL_DATA" = true ]; then
+          echo "Reinstalling data for ${cfg.appName} in 4 seconds..."
+          echo "Press CTRL-C to cancel..."
+          sleep 4
+          echo "Removing data: $DATA_DIR"
+          rm -rf "$DATA_DIR"
+        fi
       fi
 
       # Bootstrap config if not present
@@ -377,7 +403,7 @@ in
         mkdir -p "$CONFIG_DIR/lua/custom"
 
         # Copy upstream nvchad config
-        cp -rv ${inputs.nvchad-starter}/* "$CONFIG_DIR/"
+        cp -r ${inputs.nvchad-starter}/* "$CONFIG_DIR/"
 
         # Explicitly overwrite upstream config with our custom files
         chmod -R u+w "$CONFIG_DIR"
