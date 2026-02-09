@@ -3,11 +3,10 @@
   lib,
   pkgs,
   system,
-  fallbackInputs,
-  neovim,
+  cfg,
 }: let
   # Sanitize neovim by stripping treesitter parsers to avoid conflicts with lazy-managed parsers
-  neovim-sanitized = neovim.overrideAttrs (oldAttrs: {
+  neovim-sanitized = cfg.neovim.overrideAttrs (oldAttrs: {
     postInstall =
       (oldAttrs.postInstall or "")
       + ''
@@ -325,7 +324,7 @@ in
       REQUIRED_PATHS="$PATH"
 
       # Fallback paths
-      FALLBACK_PATHS="${lib.makeBinPath fallbackInputs}"
+      FALLBACK_PATHS="${lib.makeBinPath cfg.fallbackInputs}"
 
       # Per projects envs can override the fallback bins
       export PATH="$REQUIRED_PATHS:$FALLBACK_PATHS"

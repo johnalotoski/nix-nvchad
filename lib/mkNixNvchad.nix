@@ -52,10 +52,8 @@ let
       ++ modules;
   };
 
-  # Extract the evaluated config
-  cfg = evaluated.config;
 in
   import ../per-system/packages/nix-nvchad.nix {
     inherit inputs lib pkgs system;
-    inherit (cfg) fallbackInputs neovim;
+    cfg = evaluated.config;
   }
