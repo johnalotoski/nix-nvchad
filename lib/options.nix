@@ -7,11 +7,12 @@
 {
   lib,
   pkgs,
+  config,
   ...
 }: let
   inherit (builtins) attrNames elem sort;
   inherit (lib) concatStringsSep generators mkAfter mkOption types unique;
-  inherit (types) attrsOf listOf package str;
+  inherit (types) attrsOf bool listOf package str;
 
   fallbackInputs = with pkgs; [
     # LSP servers
@@ -198,6 +199,39 @@ in {
       description = ''
         Application name used for the binary name, NVIM_APPNAME, and XDG directory paths.
         This allows creating multiple distinct nix-nvchad configurations with different names.
+      '';
+    };
+
+    enableSplash = mkOption {
+      type = bool;
+      default = true;
+      description = ''
+        Whether to show the NvChad dashboard splash screen on startup.
+      '';
+    };
+
+    theme = mkOption {
+      type = str;
+      default = "midnight_breeze";
+      description = ''
+        NvChad theme to use. Available themes can be viewed in neovim with
+        `:Telescope themes`.
+      '';
+    };
+
+    themeToggleLeft = mkOption {
+      type = str;
+      default = config.theme;
+      description = ''
+        Left theme for the theme toggle (typically dark theme).
+      '';
+    };
+
+    themeToggleRight = mkOption {
+      type = str;
+      default = "sunrise_breeze";
+      description = ''
+        Right theme for the theme toggle (typically light theme).
       '';
     };
 

@@ -6,7 +6,7 @@
   cfg,
 }: let
   inherit (builtins) elem toFile toJSON;
-  inherit (lib) concatMapStringsSep getExe;
+  inherit (lib) boolToString concatMapStringsSep getExe;
   inherit (pkgs) jq runCommandLocal;
 
   # Sanitize neovim by stripping treesitter parsers to avoid conflicts with lazy-managed parsers
@@ -82,15 +82,15 @@
     local M = {}
 
     M.base46 = {
-      theme = "midnight_breeze",
-      theme_toggle = { "midnight_breeze", "sunrise_breeze" }
+      theme = "${cfg.theme}",
+      theme_toggle = { "${cfg.themeToggleLeft}", "${cfg.themeToggleRight}" }
       -- hl_override = {
       --  Comment = { italic = true },
       --  ["@comment"] = { italic = true },
       -- },
     }
 
-    M.nvdash = { load_on_startup = true }
+    M.nvdash = { load_on_startup = ${boolToString cfg.enableSplash} }
 
     -- M.ui = {
     --       tabufline = {
@@ -171,9 +171,6 @@
     vim.schedule(function()
       require "mappings"
     end)
-
-    -- MOD: Any other custom initialization
-    require "custom.init"
   '';
 
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/plugins/init.lua
@@ -185,7 +182,6 @@
         opts = require "configs.conform",
       },
 
-      -- These are some examples, uncomment them if you want to see them work!
       {
         "neovim/nvim-lspconfig",
         config = function()
@@ -193,25 +189,8 @@
         end,
       },
 
-      -- MOD: test new blink, enabled
       { import = "nvchad.blink.lazyspec" },
-
-      -- COMMENT: This doesn't work with the new nvim-treesitter API on main
-      -- See the alternate treesitter setup in init.lua and lua/custom/init.lua
-      -- {
-      --  "nvim-treesitter/nvim-treesitter",
-      --  opts = {
-      --    ensure_installed = {
-      --      "vim", "lua", "vimdoc",
-      --      "html", "css"
-      --    },
-      --  },
-      -- },
     }
-  '';
-
-  # For custom initialization
-  initCustom = toFile "init-custom.lua" ''
   '';
 
   lazyLock = let
@@ -374,7 +353,6 @@ in
         cp ${autoCmds} "$CONFIG_DIR"/lua/autocmds.lua
         cp ${chadRc} "$CONFIG_DIR"/lua/chadrc.lua
         cp ${init} "$CONFIG_DIR"/init.lua
-        cp ${initCustom} "$CONFIG_DIR"/lua/custom/init.lua
         cp ${initPlugins} "$CONFIG_DIR"/lua/plugins/init.lua
         cp ${lazyLock} "$CONFIG_DIR"/lazy-lock.json
         cp ${lspConfig} "$CONFIG_DIR"/lua/configs/lspconfig.lua
