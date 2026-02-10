@@ -5,8 +5,9 @@
   system,
   cfg,
 }: let
-  inherit (builtins) elem;
-  inherit (lib) concatMapStringsSep;
+  inherit (builtins) elem toFile toJSON;
+  inherit (lib) concatMapStringsSep getExe;
+  inherit (pkgs) jq runCommandLocal;
 
   # Sanitize neovim by stripping treesitter parsers to avoid conflicts with lazy-managed parsers
   neovim-sanitized = cfg.neovim.overrideAttrs (oldAttrs: {
@@ -19,7 +20,7 @@
   });
 
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/autocmds.lua
-  autoCmds = builtins.toFile "autocmds.lua" ''
+  autoCmds = toFile "autocmds.lua" ''
     require "nvchad.autocmds"
 
     local autocmd = vim.api.nvim_create_autocmd
@@ -72,7 +73,7 @@
   '';
 
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/chadrc.lua
-  chadRc = builtins.toFile "chadrc.lua" ''
+  chadRc = toFile "chadrc.lua" ''
     -- This file needs to have same structure as nvconfig.lua
     -- https://github.com/NvChad/ui/blob/v3.0/lua/nvconfig.lua
     -- Please read that file to know all available options :(
@@ -107,7 +108,7 @@
       if elem "all" cfg.grammars
       then ''vim.cmd("TSInstall all")''
       else ''require("nvim-treesitter").install({${concatMapStringsSep ", " (g: ''"${g}"'') cfg.grammars}})'';
-  in builtins.toFile "init.lua" ''
+  in toFile "init.lua" ''
     vim.g.base46_cache = vim.fn.stdpath "data" .. "/base46/"
     vim.g.mapleader = " "
 
@@ -176,7 +177,7 @@
   #
   # See treesitter supported languages at:
   # https://github.com/nvim-treesitter/nvim-treesitter/blob/main/SUPPORTED_LANGUAGES.md
-  initPlugins = builtins.toFile "init-plugins.lua" ''
+  initPlugins = toFile "init-plugins.lua" ''
     return {
       {
         "stevearc/conform.nvim",
@@ -210,41 +211,20 @@
   '';
 
   # For custom initialization
-  initCustom = pkgs.writeText "init-custom.lua" ''
+  initCustom = toFile "init-custom.lua" ''
   '';
 
-  # Lazy can't lock itself with its own lock file
-  lazyLock = builtins.toFile "lazy-lock.json" ''
-    {
-      "LuaSnip": { "branch": "master", "commit": "dae4f5aaa3574bd0c2b9dd20fb9542a02c10471c" },
-      "NvChad": { "branch": "v2.5", "commit": "c57b82473b821274f6017eb03582ba1d13be9d8c" },
-      "base46": { "branch": "v3.0", "commit": "884b990dcdbe07520a0892da6ba3e8d202b46337" },
-      "blink.cmp": { "branch": "main", "commit": "b19413d214068f316c78978b08264ed1c41830ec" },
-      "conform.nvim": { "branch": "master", "commit": "c2526f1cde528a66e086ab1668e996d162c75f4f" },
-      "friendly-snippets": { "branch": "main", "commit": "6cd7280adead7f586db6fccbd15d2cac7e2188b9" },
-      "gitsigns.nvim": { "branch": "main", "commit": "abf82a65f185bd54adc0679f74b7d6e1ada690c9" },
-      "indent-blankline.nvim": { "branch": "master", "commit": "005b56001b2cb30bfa61b7986bc50657816ba4ba" },
-      "mason.nvim": { "branch": "main", "commit": "44d1e90e1f66e077268191e3ee9d2ac97cc18e65" },
-      "menu": { "branch": "main", "commit": "7a0a4a2896b715c066cfbe320bdc048091874cc6" },
-      "minty": { "branch": "main", "commit": "aafc9e8e0afe6bf57580858a2849578d8d8db9e0" },
-      "nvim-autopairs": { "branch": "master", "commit": "007047febaa3681a8d2f3dd5126fdb9c6e81f393" },
-      "nvim-lspconfig": { "branch": "master", "commit": "79c9a15be5731bc8694840a8fb0c9141c20a80c0" },
-      "nvim-tree.lua": { "branch": "master", "commit": "c07ce43527e5f0242121f4eb1feb7ac0ecea8275" },
-      "nvim-treesitter": { "branch": "main", "commit": "19c729dae6e0eeb79423df0cf37780aa9a7cc3b7" },
-      "nvim-web-devicons": { "branch": "master", "commit": "803353450c374192393f5387b6a0176d0972b848" },
-      "plenary.nvim": { "branch": "master", "commit": "b9fd5226c2f76c951fc8ed5923d85e4de065e509" },
-      "telescope.nvim": { "branch": "master", "commit": "ad7d9580338354ccc136e5b8f0aa4f880434dcdc" },
-      "ui": { "branch": "v3.0", "commit": "cb75908a86720172594b30de147272c1b3a7f452" },
-      "volt": { "branch": "main", "commit": "620de1321f275ec9d80028c68d1b88b409c0c8b1" },
-      "which-key.nvim": { "branch": "main", "commit": "3aab2147e74890957785941f0c1ad87d0a44c15a" }
-    }
+  lazyLock = let
+    lazyLockCompact = toFile "lazy-lock-compact.json" (toJSON cfg.lazyLock);
+  in runCommandLocal "lazy-lock.json" {} ''
+    ${getExe jq} --sort-keys . < ${lazyLockCompact} > $out
   '';
 
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/configs/lspconfig.lua
   #
   # For available LSPs, view:
   # https://github.com/neovim/nvim-lspconfig/blob/master/doc/configs.md
-  lspConfig = builtins.toFile "lspconfig.lua" ''
+  lspConfig = toFile "lspconfig.lua" ''
     require("nvchad.configs.lspconfig").defaults()
 
     -- LSP servers from either the nix-nvchad package or the environment
@@ -280,7 +260,7 @@
   '';
 
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/options.lua
-  options = builtins.toFile "options.lua" ''
+  options = toFile "options.lua" ''
     require "nvchad.options"
 
     local opt = vim.opt
@@ -310,12 +290,14 @@ in
       # Core tools for neovim plugins (telescope, treesitter, etc.)
       coreutils
       curl
+      difftastic
       fd
       gcc
       git
       gnumake
       gnutar
       gzip
+      jq
       nodejs
       ripgrep
 
@@ -418,6 +400,32 @@ in
 
         # And again, ensure config is writable
         chmod -R u+w "$CONFIG_DIR"
+      fi
+
+      # Obtain a canonical form of the lazy-lock.json data.
+      # Exclude any "lazy.nvim" json key value pair as lazy cannot lock itself via its own lock file.
+      LAZY_LOCK=$(jq --sort-keys 'del(."lazy.nvim")' < "$CONFIG_DIR"/lazy-lock.json)
+
+      # Lazy serializes the lazy-lock.json file to its own format regularly.
+      # Compare the declared values to the actual contents, both in canonical form, to ensure they remain the same.
+      if ! difft --check-only --exit-code ${lazyLock} <(echo "$LAZY_LOCK") &> /dev/null; then
+        echo "Lazy lock contents appear to have changed:"
+        echo
+        echo "Left column is the declared content, right column is the current lazy-lock.json content"
+        difft ${lazyLock} <(echo "$LAZY_LOCK")
+        echo
+        read -r -p "Restore declared lock? [y/N] " RESPONSE
+        if [[ "$RESPONSE" =~ ^[Yy]$ ]]; then
+          cp ${lazyLock} "$CONFIG_DIR"/lazy-lock.json
+          echo "Lock file restored."
+          read -r -p "Run Lazy restore now (headless)? [y/N] " RESPONSE
+          if [[ "$RESPONSE" =~ ^[Yy]$ ]]; then
+            nvim --headless "+Lazy! restore" +qa
+          else
+            echo "Run ':Lazy restore' in neovim to sync plugins."
+          fi
+        fi
+        read -s -r -n 1 -p "Press a key to continue..."
       fi
 
       exec nvim "''${ARGS[@]}"
