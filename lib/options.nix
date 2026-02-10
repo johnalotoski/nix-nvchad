@@ -11,8 +11,61 @@
   ...
 }: let
   inherit (builtins) attrNames elem sort;
-  inherit (lib) concatStringsSep generators mkAfter mkOption types unique;
-  inherit (types) attrsOf bool listOf package str;
+  inherit (lib) concatStringsSep generators mkAfter mkBefore mkOption types unique;
+  inherit (types) attrsOf bool lines listOf package str;
+
+  # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/autocmds.lua
+  autoCmds = ''
+    require "nvchad.autocmds"
+
+    local autocmd = vim.api.nvim_create_autocmd
+
+    -- Show trailing whitespace
+    vim.api.nvim_set_hl(0, "ExtraWhitespace", { bg = "LightCoral" })
+    autocmd("ColorScheme", {
+      pattern = "*",
+      callback = function()
+        vim.api.nvim_set_hl(0, "ExtraWhitespace", { bg = "LightCoral" })
+      end,
+    })
+    autocmd("BufEnter", {
+      pattern = "*",
+      command = [[match ExtraWhitespace /\s\+$/]],
+    })
+    autocmd("InsertEnter", {
+      pattern = "*",
+      command = [[match ExtraWhitespace /\s\+\%#\@<!$/]],
+    })
+    autocmd("InsertLeave", {
+      pattern = "*",
+      command = [[match ExtraWhitespace /\s\+$/]],
+    })
+
+    -- Show tabs
+    vim.api.nvim_set_hl(0, "Tabs", { bg = "SteelBlue" })
+    autocmd("ColorScheme", {
+      pattern = "*",
+      callback = function()
+        vim.api.nvim_set_hl(0, "Tabs", { bg = "SteelBlue" })
+      end,
+    })
+    autocmd({ "BufEnter", "InsertEnter", "InsertLeave" }, {
+      pattern = "*",
+      command = [[2match Tabs /\t\+/]],
+    })
+
+    -- Trim trailing whitespace on save
+    autocmd("BufWritePre", {
+      pattern = "*",
+      command = [[%s/\s\+$//e]],
+    })
+
+    -- Retab on save
+    autocmd("BufWritePre", {
+      pattern = "*",
+      command = "retab",
+    })
+  '';
 
   fallbackInputs = with pkgs; [
     # LSP servers
@@ -43,7 +96,6 @@
     statix                                   # Nix
   ];
 
-
   # See treesitter supported languages at:
   # https://github.com/nvim-treesitter/nvim-treesitter/blob/main/SUPPORTED_LANGUAGES.md
   grammars = [
@@ -56,31 +108,6 @@
     "nix"
     "nu"
     "query"
-  ];
-
-  # For available LSPs, view:
-  # https://github.com/neovim/nvim-lspconfig/blob/master/doc/configs.md
-  lspServers = [
-    "bashls"         # Bash
-    "clangd"         # C/C++
-    "crystalline"    # Crystal Lang
-    "cssls"          # CSS
-    "eslint"         # ESLint
-    "gh_actions_ls"  # GHA, not in default fallbackInputs
-    "gopls"          # Go
-    "hls"            # Haskell, not in default fallbackInputs
-    "html"           # HTML
-    "jsonls"         # JSON
-    "lua_ls"         # Lua
-    "marksman"       # Markdown
-    "nixd"           # Nix
-    "nushell"        # Nushell, not in default fallbackInputs
-    "pyright"        # Python
-    "rust_analyzer"  # Rust
-    "systemd_ls"     # Systemd
-    "taplo"          # TOML
-    "ts_ls"          # TypeScript/JavaScript
-    "yamlls"         # YAML
   ];
 
   # Lazy can't lock itself with its own lock file
@@ -191,6 +218,49 @@
     };
   };
 
+  # For available LSPs, view:
+  # https://github.com/neovim/nvim-lspconfig/blob/master/doc/configs.md
+  lspServers = [
+    "bashls"         # Bash
+    "clangd"         # C/C++
+    "crystalline"    # Crystal Lang
+    "cssls"          # CSS
+    "eslint"         # ESLint
+    "gh_actions_ls"  # GHA, not in default fallbackInputs
+    "gopls"          # Go
+    "hls"            # Haskell, not in default fallbackInputs
+    "html"           # HTML
+    "jsonls"         # JSON
+    "lua_ls"         # Lua
+    "marksman"       # Markdown
+    "nixd"           # Nix
+    "nushell"        # Nushell, not in default fallbackInputs
+    "pyright"        # Python
+    "rust_analyzer"  # Rust
+    "systemd_ls"     # Systemd
+    "taplo"          # TOML
+    "ts_ls"          # TypeScript/JavaScript
+    "yamlls"         # YAML
+  ];
+
+  # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/options.lua
+  vimOptions = ''
+    require "nvchad.options"
+
+    local opt = vim.opt
+    opt.autoindent = true
+    opt.cursorcolumn = true
+    opt.cursorlineopt = "both"
+    opt.cursorline = true
+    opt.expandtab = true
+
+    -- Defaults via `:set formatoptions?` are `tcqj`
+    opt.formatoptions:append "r" -- Continue comments on Enter
+    opt.formatoptions:append "o" -- Continue comments on 'o'
+
+    opt.shiftwidth = 2
+    opt.tabstop = 2
+  '';
 in {
   options = {
     appName = mkOption {
@@ -202,6 +272,25 @@ in {
       '';
     };
 
+    autoCmds = mkOption {
+      type = lines;
+      default = "";
+      description = ''
+        Lua code for autocommands to include in `autocmds.lua`.
+
+        A default set is included which:
+        - Highlights trailing whitespace in LightCoral
+        - Highlights tabs in SteelBlue
+        - Trims trailing whitespace on save
+        - Retabs on save
+
+        To add to the default autocommands, simply declare more and they
+        will be appended after the defaults.
+
+        To override the default autocommands, use `mkForce` in the declaration.
+      '';
+    };
+
     enableSplash = mkOption {
       type = bool;
       default = true;
@@ -210,28 +299,52 @@ in {
       '';
     };
 
-    theme = mkOption {
-      type = str;
-      default = "midnight_breeze";
+    extraChadRc = mkOption {
+      type = lines;
+      default = "";
       description = ''
-        NvChad theme to use. Available themes can be viewed in neovim with
-        `:Telescope themes`.
+        Extra Lua code to include in `chadrc.lua` before the `return M` statement.
+
+        This allows adding additional NvChad configuration options beyond the
+        dedicated options (theme, enableSplash, etc.). The code has access to
+        the `M` table that gets returned.
+
+        Example:
+        ```nix
+        extraChadRc = '''
+          M.ui = {
+            tabufline = {
+              lazyload = false
+            }
+          }
+        ''';
+        ```
+
+        See <https://github.com/NvChad/ui/blob/v3.0/lua/nvconfig.lua> for
+        available options.
       '';
     };
 
-    themeToggleLeft = mkOption {
-      type = str;
-      default = config.theme;
+    extraPlugins = mkOption {
+      type = lines;
+      default = "";
       description = ''
-        Left theme for the theme toggle (typically dark theme).
-      '';
-    };
+        Extra Lua plugin specs to include in `lua/plugins/init.lua`.
 
-    themeToggleRight = mkOption {
-      type = str;
-      default = "sunrise_breeze";
-      description = ''
-        Right theme for the theme toggle (typically light theme).
+        These are added to the plugins table before the closing brace.
+        Each entry should be a valid lazy.nvim plugin spec.
+
+        Example:
+        ```nix
+        extraPlugins = '''
+          {
+            "github/copilot.vim",
+            lazy = false,
+          },
+        ''';
+        ```
+
+        See <https://lazy.folke.io/spec> for plugin spec format.
       '';
     };
 
@@ -284,30 +397,6 @@ in {
       '';
     };
 
-    lspServers = mkOption {
-      type = listOf str;
-      default = [];
-      apply = unique;
-      description = ''
-        List of LSP servers to enable. The list elements must be valid
-        nvim-lspconfig server names. Available servers can be found at:
-
-        <https://github.com/neovim/nvim-lspconfig/blob/master/doc/configs.md>
-
-        A default set is included, consisting of:
-
-        ```
-        ${concatStringsSep "\n" (sort (a: b: a < b) lspServers)}
-        ```
-
-        To add to the default list of servers, simply declare more and they
-        will be merged with the default list.
-
-        To override the default list of servers, use `mkForce` in the
-        declaration.
-      '';
-    };
-
     lazyLock = mkOption {
       type = attrsOf (attrsOf str);
       default = {};
@@ -336,6 +425,30 @@ in {
       '';
     };
 
+    lspServers = mkOption {
+      type = listOf str;
+      default = [];
+      apply = unique;
+      description = ''
+        List of LSP servers to enable. The list elements must be valid
+        nvim-lspconfig server names. Available servers can be found at:
+
+        <https://github.com/neovim/nvim-lspconfig/blob/master/doc/configs.md>
+
+        A default set is included, consisting of:
+
+        ```
+        ${concatStringsSep "\n" (sort (a: b: a < b) lspServers)}
+        ```
+
+        To add to the default list of servers, simply declare more and they
+        will be merged with the default list.
+
+        To override the default list of servers, use `mkForce` in the
+        declaration.
+      '';
+    };
+
     neovim = mkOption {
       type = package;
       default = pkgs.neovim-unwrapped;
@@ -348,13 +461,57 @@ in {
       '';
     };
 
+    vimOptions = mkOption {
+      type = lines;
+      default = "";
+      description = ''
+        Lua code for vim options to include in `options.lua`.
+
+        A default set is included which configures:
+        - autoindent, cursorcolumn, cursorline enabled
+        - expandtab with shiftwidth=2 and tabstop=2
+        - formatoptions with 'r' and 'o' for comment continuation
+
+        To add to the default options, simply declare more and they
+        will be appended after the defaults.
+
+        To override the default options, use `mkForce` in the declaration.
+      '';
+    };
+
+    theme = mkOption {
+      type = str;
+      default = "midnight_breeze";
+      description = ''
+        NvChad theme to use. Available themes can be viewed in neovim with
+        `:Telescope themes`.
+      '';
+    };
+
+    themeToggleLeft = mkOption {
+      type = str;
+      default = config.theme;
+      description = ''
+        Left theme for the theme toggle (typically dark theme).
+      '';
+    };
+
+    themeToggleRight = mkOption {
+      type = str;
+      default = "sunrise_breeze";
+      description = ''
+        Right theme for the theme toggle (typically light theme).
+      '';
+    };
   };
 
   config = {
     inherit lazyLock;
 
+    autoCmds = mkBefore autoCmds;
     fallbackInputs = mkAfter fallbackInputs;
     grammars = mkAfter grammars;
     lspServers = mkAfter lspServers;
+    vimOptions = mkBefore vimOptions;
   };
 }

@@ -19,58 +19,7 @@
       '';
   });
 
-  # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/autocmds.lua
-  autoCmds = toFile "autocmds.lua" ''
-    require "nvchad.autocmds"
-
-    local autocmd = vim.api.nvim_create_autocmd
-
-    -- Show trailing whitespace
-    vim.api.nvim_set_hl(0, "ExtraWhitespace", { bg = "LightCoral" })
-    autocmd("ColorScheme", {
-      pattern = "*",
-      callback = function()
-        vim.api.nvim_set_hl(0, "ExtraWhitespace", { bg = "LightCoral" })
-      end,
-    })
-    autocmd("BufEnter", {
-      pattern = "*",
-      command = [[match ExtraWhitespace /\s\+$/]],
-    })
-    autocmd("InsertEnter", {
-      pattern = "*",
-      command = [[match ExtraWhitespace /\s\+\%#\@<!$/]],
-    })
-    autocmd("InsertLeave", {
-      pattern = "*",
-      command = [[match ExtraWhitespace /\s\+$/]],
-    })
-
-    -- Show tabs
-    vim.api.nvim_set_hl(0, "Tabs", { bg = "SteelBlue" })
-    autocmd("ColorScheme", {
-      pattern = "*",
-      callback = function()
-        vim.api.nvim_set_hl(0, "Tabs", { bg = "SteelBlue" })
-      end,
-    })
-    autocmd({ "BufEnter", "InsertEnter", "InsertLeave" }, {
-      pattern = "*",
-      command = [[2match Tabs /\t\+/]],
-    })
-
-    -- Trim trailing whitespace on save
-    autocmd("BufWritePre", {
-      pattern = "*",
-      command = [[%s/\s\+$//e]],
-    })
-
-    -- Retab on save
-    autocmd("BufWritePre", {
-      pattern = "*",
-      command = "retab",
-    })
-  '';
+  autoCmds = toFile "autocmds.lua" cfg.autoCmds;
 
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/chadrc.lua
   chadRc = toFile "chadrc.lua" ''
@@ -92,12 +41,7 @@
 
     M.nvdash = { load_on_startup = ${boolToString cfg.enableSplash} }
 
-    -- M.ui = {
-    --       tabufline = {
-    --          lazyload = false
-    --      }
-    -- }
-
+    ${cfg.extraChadRc}
     return M
   '';
 
@@ -190,6 +134,8 @@
       },
 
       { import = "nvchad.blink.lazyspec" },
+
+      ${cfg.extraPlugins}
     }
   '';
 
@@ -216,28 +162,13 @@
     -- not provided by package or environment, expect LSP missing binary
     -- errors when opening a file of this type.
     local servers = {${servers}}
+
     vim.lsp.enable(servers)
+
     -- read :h vim.lsp.config for changing options of lsp servers
   '';
 
-  # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/options.lua
-  options = toFile "options.lua" ''
-    require "nvchad.options"
-
-    local opt = vim.opt
-    opt.autoindent = true
-    opt.cursorcolumn = true
-    opt.cursorlineopt = "both"
-    opt.cursorline = true
-    opt.expandtab = true
-
-    -- Defaults via `:set formatoptions?` are `tcqj`
-    opt.formatoptions:append "r" -- Continue comments on Enter
-    opt.formatoptions:append "o" -- Continue comments on 'o'
-
-    opt.shiftwidth = 2
-    opt.tabstop = 2
-  '';
+  options = toFile "options.lua" cfg.vimOptions;
 in
   pkgs.writeShellApplication {
     name = cfg.appName;
