@@ -104,6 +104,9 @@
   # Upstream ref: https://github.com/NvChad/starter/blob/main/init.lua
   init = let
     # Grammar install command for config function (runs on each startup)
+    #
+    # See treesitter supported languages at:
+    # https://github.com/nvim-treesitter/nvim-treesitter/blob/main/SUPPORTED_LANGUAGES.md
     treesitterInstall =
       if elem "all" cfg.grammars
       then ''vim.cmd("TSInstall all")''
@@ -174,9 +177,6 @@
   '';
 
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/plugins/init.lua
-  #
-  # See treesitter supported languages at:
-  # https://github.com/nvim-treesitter/nvim-treesitter/blob/main/SUPPORTED_LANGUAGES.md
   initPlugins = toFile "init-plugins.lua" ''
     return {
       {
@@ -224,37 +224,19 @@
   #
   # For available LSPs, view:
   # https://github.com/neovim/nvim-lspconfig/blob/master/doc/configs.md
-  lspConfig = toFile "lspconfig.lua" ''
+  lspConfig = let
+    servers = concatMapStringsSep ", " (s: ''"${s}"'') cfg.lspServers;
+  in toFile "lspconfig.lua" ''
     require("nvchad.configs.lspconfig").defaults()
 
-    -- LSP servers from either the nix-nvchad package or the environment
+    -- LSP servers from either the nix-nvchad packages fallbackInputs or the environment.
+    --
     -- When LSP servers are either very large or not used frequently,
     -- they will be expected from the project's env so as not to bloat
     -- the base nix-nvchad package.  If an LSP is defined here, but
-    -- noted to be expected from the environment and is not provided,
-    -- expect LSP missing binary errors when opening a file of this type.
-    local servers = {
-      "bashls",         -- Bash
-      "clangd",         -- C/C++
-      "crystalline",    -- Crystal Lang
-      "cssls",          -- CSS
-      "eslint",         -- ESLint
-      "gh_actions_ls",  -- GHA, from env only
-      "gopls",          -- Go
-      "hls",            -- Haskell, from env only
-      "html",           -- HTML
-      "jsonls",         -- JSON
-      "lua_ls",         -- Lua
-      "marksman",       -- Markdown
-      "nixd",           -- Nix
-      "nushell",        -- Nushell, from env only
-      "pyright",        -- Python
-      "rust_analyzer",  -- Rust
-      "system_lsp",     -- Systemd
-      "taplo",          -- TOML
-      "ts_ls",          -- TypeScript/JavaScript
-      "yamlls",         -- YAML
-    }
+    -- not provided by package or environment, expect LSP missing binary
+    -- errors when opening a file of this type.
+    local servers = {${servers}}
     vim.lsp.enable(servers)
     -- read :h vim.lsp.config for changing options of lsp servers
   '';

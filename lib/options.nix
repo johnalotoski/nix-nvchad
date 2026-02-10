@@ -42,6 +42,9 @@
     statix                                   # Nix
   ];
 
+
+  # See treesitter supported languages at:
+  # https://github.com/nvim-treesitter/nvim-treesitter/blob/main/SUPPORTED_LANGUAGES.md
   grammars = [
     "css"
     "html"
@@ -52,6 +55,31 @@
     "nix"
     "nu"
     "query"
+  ];
+
+  # For available LSPs, view:
+  # https://github.com/neovim/nvim-lspconfig/blob/master/doc/configs.md
+  lspServers = [
+    "bashls"         # Bash
+    "clangd"         # C/C++
+    "crystalline"    # Crystal Lang
+    "cssls"          # CSS
+    "eslint"         # ESLint
+    "gh_actions_ls"  # GHA, not in default fallbackInputs
+    "gopls"          # Go
+    "hls"            # Haskell, not in default fallbackInputs
+    "html"           # HTML
+    "jsonls"         # JSON
+    "lua_ls"         # Lua
+    "marksman"       # Markdown
+    "nixd"           # Nix
+    "nushell"        # Nushell, not in default fallbackInputs
+    "pyright"        # Python
+    "rust_analyzer"  # Rust
+    "systemd_ls"     # Systemd
+    "taplo"          # TOML
+    "ts_ls"          # TypeScript/JavaScript
+    "yamlls"         # YAML
   ];
 
   # Lazy can't lock itself with its own lock file
@@ -222,6 +250,30 @@ in {
       '';
     };
 
+    lspServers = mkOption {
+      type = listOf str;
+      default = [];
+      apply = unique;
+      description = ''
+        List of LSP servers to enable. The list elements must be valid
+        nvim-lspconfig server names. Available servers can be found at:
+
+        <https://github.com/neovim/nvim-lspconfig/blob/master/doc/configs.md>
+
+        A default set is included, consisting of:
+
+        ```
+        ${concatStringsSep "\n" (sort (a: b: a < b) lspServers)}
+        ```
+
+        To add to the default list of servers, simply declare more and they
+        will be merged with the default list.
+
+        To override the default list of servers, use `mkForce` in the
+        declaration.
+      '';
+    };
+
     lazyLock = mkOption {
       type = attrsOf (attrsOf str);
       default = {};
@@ -269,5 +321,6 @@ in {
 
     fallbackInputs = mkAfter fallbackInputs;
     grammars = mkAfter grammars;
+    lspServers = mkAfter lspServers;
   };
 }
