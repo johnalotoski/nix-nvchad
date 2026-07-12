@@ -75,8 +75,8 @@
     lua-language-server                      # Lua
     marksman                                 # Markdown
     nixd                                     # Nix
-    nodePackages.bash-language-server        # Bash
-    nodePackages.typescript-language-server  # TypeScript/JavaScript
+    bash-language-server                     # Bash
+    typescript-language-server               # TypeScript/JavaScript
     pyright                                  # Python
     rust-analyzer                            # Rust
     systemd-lsp                              # Systemd
@@ -86,8 +86,8 @@
 
     # Formatters
     black                                    # Python
-    nixfmt-rfc-style                         # Nix
-    nodePackages.prettier                    # JS/TS/HTML/CSS/JSON/MD
+    nixfmt                                   # Nix
+    prettier                                 # JS/TS/HTML/CSS/JSON/MD
     shfmt                                    # Shell
     stylua                                   # Lua
 

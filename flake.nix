@@ -3,12 +3,11 @@
 
   # TODO
   # nerd-font
-  # map init to source with append
-  # grammar module
-  # lua debug module
+  # post-build mod for nightly
+  # default timeout prompting
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 
