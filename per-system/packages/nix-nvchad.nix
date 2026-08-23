@@ -112,6 +112,9 @@
     require "options"
     require "autocmds"
 
+    -- MOD: To add custom user commands, ex: OSC52Copy
+    require "usercmds"
+
     vim.schedule(function()
       require "mappings"
     end)
@@ -169,6 +172,8 @@
   '';
 
   options = toFile "options.lua" cfg.vimOptions;
+
+  userCommands = toFile "usercmds.lua" cfg.userCommands;
 in
   pkgs.writeShellApplication {
     name = cfg.appName;
@@ -288,6 +293,7 @@ in
         cp ${lazyLock} "$CONFIG_DIR"/lazy-lock.json
         cp ${lspConfig} "$CONFIG_DIR"/lua/configs/lspconfig.lua
         cp ${options} "$CONFIG_DIR"/lua/options.lua
+        cp ${userCommands} "$CONFIG_DIR"/lua/usercmds.lua
 
         # And again, ensure config is writable
         chmod -R u+w "$CONFIG_DIR"

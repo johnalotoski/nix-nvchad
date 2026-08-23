@@ -253,6 +253,59 @@
     "yamlls"         # YAML
   ];
 
+  userCommands = ''
+    -- OSC 52 clipboard: copy (write) only.
+    --
+    -- Konsole supports OSC 52 write but not read, so there is intentionally no
+    -- paste command.  Paste locally with the terminal's own paste, ctrl-shift-v.
+    --
+    -- This deliberately leaves `vim.g.clipboard` and the default `+` and `*`
+    -- register behavior alone so native local copy and paste, xclip or wl-copy,
+    -- keeps working.  Yank as usual, then push the register by hand.
+    --
+    -- Multiplexer passthrough is assumed to already be configured, tmux
+    -- `set-clipboard on` and `allow-passthrough`.  `nvim_ui_send` writes the
+    -- plain sequence to the attached ui and relies on the multiplexer to relay
+    -- it, matching how the rest of the stack works.
+    vim.api.nvim_create_user_command("OSC52Copy", function(opts)
+      local reg = opts.args ~= "" and opts.args or [["]]
+      local lines = vim.fn.getreg(reg, 1, true)
+
+      if #lines == 0 then
+        vim.notify("OSC52Copy: register " .. reg .. " is empty", vim.log.levels.WARN)
+        return
+      end
+
+      require("vim.ui.clipboard.osc52").copy("+")(lines)
+      vim.notify(("OSC52Copy: sent %d line(s) from register %s"):format(#lines, reg))
+    end, {
+      nargs = "?",
+      desc = "OSC 52 copy a register to the local clipboard, unnamed by default",
+    })
+
+    -- Opt-in helpers, both push whatever is in the unnamed register.  Plain `y`
+    -- is left alone.
+    --
+    -- Placed under `<leader>r`, which NvChad already uses as a prefix for `ra`
+    -- and `rn`, so no new prefix is introduced and no key sequence gains a wait
+    -- that it did not already have.  The `o` is for osc52.
+    --
+    -- Normal mode pushes as-is so it composes with motion yanks, ex: y3j or
+    -- yiw.  Note `d`, `c` and `x` also write the unnamed register, so a push
+    -- right after a delete sends the deleted text.
+    --
+    -- Visual mode yanks the selection first, so no separate `y` is needed.
+    -- Mapped in `x` and not `v` so select mode, where LuaSnip puts the cursor on
+    -- snippet placeholders, keeps its own space behavior.
+    vim.keymap.set("n", "<leader>ro", "<Cmd>OSC52Copy<CR>", {
+      desc = "OSC 52 copy the unnamed register to the local clipboard",
+    })
+
+    vim.keymap.set("x", "<leader>ro", "y<Cmd>OSC52Copy<CR>", {
+      desc = "OSC 52 copy the visual selection to the local clipboard",
+    })
+  '';
+
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/options.lua
   vimOptions = ''
     require "nvchad.options"
@@ -515,6 +568,33 @@ in {
         Right theme for the theme toggle (typically light theme).
       '';
     };
+
+    userCommands = mkOption {
+      type = lines;
+      default = "";
+      description = ''
+        Lua code for user commands to include in `usercmds.lua`.
+
+        A default set is included which:
+        - Adds `:OSC52Copy [register]` to push a register to the local clipboard
+          over OSC 52, defaulting to the unnamed register
+        - Maps normal mode `<leader>ro` to push the unnamed register as-is,
+          which composes with motion yanks such as `y3j`
+        - Maps visual mode `<leader>ro` to yank the selection and push it
+
+        The mappings sit under NvChad's existing `<leader>r` prefix so that no
+        new key sequence gains a which-key wait.
+
+        The OSC 52 support is copy only, since terminals such as Konsole
+        implement the write but not the read.  It leaves `vim.g.clipboard` and
+        the default `+` and `*` registers untouched.
+
+        To add to the default user commands, simply declare more and they
+        will be appended after the defaults.
+
+        To override the default user commands, use `mkForce` in the declaration.
+      '';
+    };
   };
 
   config = {
@@ -524,6 +604,7 @@ in {
     fallbackInputs = mkAfter fallbackInputs;
     grammars = mkAfter grammars;
     lspServers = mkAfter lspServers;
+    userCommands = mkBefore userCommands;
     vimOptions = mkBefore vimOptions;
   };
 }
