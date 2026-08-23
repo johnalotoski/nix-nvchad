@@ -65,6 +65,16 @@
       pattern = "*",
       command = "retab",
     })
+
+    -- Start treesitter highlighting explicitly since nvim-treesitter main
+    -- branch no longer auto-enables it; this also makes `spell` work in
+    -- comments and strings via the @spell query captures
+    autocmd("FileType", {
+      pattern = "*",
+      callback = function(args)
+        pcall(vim.treesitter.start, args.buf)
+      end,
+    })
   '';
 
   fallbackInputs = with pkgs; [
@@ -283,6 +293,8 @@ in {
         - Highlights tabs in SteelBlue
         - Trims trailing whitespace on save
         - Retabs on save
+        - Starts treesitter highlighting per filetype, enabling `spell` in
+          comments and strings via @spell query captures
 
         To add to the default autocommands, simply declare more and they
         will be appended after the defaults.
