@@ -6,7 +6,7 @@
   cfg,
 }: let
   inherit (builtins) elem toFile toJSON;
-  inherit (lib) boolToString concatMapStringsSep getExe;
+  inherit (lib) boolToString concatMapStringsSep getExe licenses;
   inherit (pkgs) jq runCommandLocal;
 
   # Sanitize neovim by stripping treesitter parsers to avoid conflicts with lazy-managed parsers
@@ -177,6 +177,8 @@
 in
   pkgs.writeShellApplication {
     name = cfg.appName;
+
+    meta.license = licenses.mit;
 
     # Pass the parent environment path to neovim
     inheritPath = true;
