@@ -112,6 +112,8 @@
     "css"
     "html"
     "lua"
+    "markdown"
+    "markdown_inline"
     "vim"
     "vimdoc"
     "go"
