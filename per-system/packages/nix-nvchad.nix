@@ -171,6 +171,23 @@
     -- read :h vim.lsp.config for changing options of lsp servers
   '';
 
+  mappings = toFile "mappings.lua" (builtins.readFile "${inputs.nvchad-starter}/lua/mappings.lua" + ''
+
+    -- Yank diagnostics on the current line to the system clipboard.
+    vim.keymap.set("n", "<leader>yd", function()
+      local diagnostics = vim.diagnostic.get(0, { lnum = vim.fn.line(".") - 1 })
+      if #diagnostics == 0 then
+        vim.notify("No diagnostics on the current line", vim.log.levels.INFO)
+        return
+      end
+
+      local messages = vim.tbl_map(function(diagnostic)
+        return diagnostic.message
+      end, diagnostics)
+      vim.fn.setreg("+", table.concat(messages, "\n"))
+    end, { desc = "Yank line diagnostics to clipboard" })
+  '');
+
   options = toFile "options.lua" cfg.vimOptions;
 
   userCommands = toFile "usercmds.lua" cfg.userCommands;
@@ -294,6 +311,7 @@ in
         cp ${initPlugins} "$CONFIG_DIR"/lua/plugins/init.lua
         cp ${lazyLock} "$CONFIG_DIR"/lazy-lock.json
         cp ${lspConfig} "$CONFIG_DIR"/lua/configs/lspconfig.lua
+        cp ${mappings} "$CONFIG_DIR"/lua/mappings.lua
         cp ${options} "$CONFIG_DIR"/lua/options.lua
         cp ${userCommands} "$CONFIG_DIR"/lua/usercmds.lua
 
