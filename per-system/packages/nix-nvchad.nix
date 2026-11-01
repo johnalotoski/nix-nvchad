@@ -6,7 +6,7 @@
   cfg,
 }: let
   inherit (builtins) elem toFile toJSON;
-  inherit (lib) boolToString concatMapStringsSep getExe licenses;
+  inherit (lib) boolToString concatMapStringsSep getExe licenses optionalString;
   inherit (pkgs) jq runCommandLocal;
 
   # Sanitize neovim by stripping treesitter parsers to avoid conflicts with lazy-managed parsers
@@ -20,6 +20,96 @@
   });
 
   autoCmds = toFile "autocmds.lua" cfg.autoCmds;
+
+  formattingSettings = toFile "formatting.json" (toJSON cfg.formatting);
+  conformConfig = toFile "conform.lua" (if !cfg.formatting.enable
+    then builtins.readFile "${inputs.nvchad-starter}/lua/configs/conform.lua"
+    else ''
+    local settings = vim.json.decode(table.concat(vim.fn.readfile("${formattingSettings}"), "\n"))
+
+    local function treefmt_root(bufnr)
+      if not settings.preferTreefmt then
+        return nil
+      end
+      local filename = vim.api.nvim_buf_get_name(bufnr)
+      if filename == "" then
+        return nil
+      end
+      local root = vim.fs.root(filename, { "treefmt.toml", ".treefmt.toml" })
+      if root then
+        return root
+      end
+      if settings.treefmtCommand ~= vim.NIL then
+        return vim.fs.root(filename, { "flake.nix", ".git" }) or vim.fs.dirname(filename)
+      end
+    end
+
+    local function format_options(bufnr)
+      return {
+        timeout_ms = settings.timeoutMs,
+        -- A project treefmt policy also owns exclusions and missing-tool errors.
+        lsp_format = not treefmt_root(bufnr) and settings.lspFallback and "fallback" or "never",
+      }
+    end
+
+    if vim.g.disable_autoformat == nil then
+      vim.g.disable_autoformat = not settings.onSave
+    end
+    vim.api.nvim_create_user_command("FormatToggle", function(args)
+      local scope = args.bang and vim.b or vim.g
+      scope.disable_autoformat = not scope.disable_autoformat
+      vim.notify((args.bang and "Buffer" or "Global") .. " format on save: "
+        .. (scope.disable_autoformat and "disabled" or "enabled"))
+    end, { bang = true, desc = "Toggle format on save (! for current buffer)" })
+
+    local formatters_by_ft = {}
+    for ft, formatters in pairs(settings.formattersByFt) do
+      formatters_by_ft[ft] = function(bufnr)
+        return treefmt_root(bufnr) and {} or formatters
+      end
+    end
+    formatters_by_ft["*"] = function(bufnr)
+      if treefmt_root(bufnr) then
+        return { "treefmt" }
+      end
+      return settings.formattersByFt["*"] or {}
+    end
+
+    return {
+      formatters_by_ft = formatters_by_ft,
+      formatters = {
+        treefmt = {
+          inherit = false,
+          command = settings.treefmtCommand ~= vim.NIL and settings.treefmtCommand or "treefmt",
+          -- Stdin paths must be relative to the tree root, including on treefmt 2.4.
+          args = function(_, ctx)
+            local root = treefmt_root(ctx.buf)
+            return { "--tree-root", root, "--stdin", vim.fs.relpath(root, ctx.filename) }
+          end,
+          stdin = true,
+          cwd = function(_, ctx) return treefmt_root(ctx.buf) end,
+          require_cwd = true,
+        },
+      },
+      default_format_opts = {
+        timeout_ms = settings.timeoutMs,
+        lsp_format = settings.lspFallback and "fallback" or "never",
+      },
+      format_on_save = function(bufnr)
+        if vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat
+          or vim.bo[bufnr].buftype ~= "" or vim.api.nvim_buf_get_name(bufnr) == "" then
+          return
+        end
+        local opts = format_options(bufnr)
+        if treefmt_root(bufnr) then
+          opts.formatters = { "treefmt" } -- Surface unavailable project tools as errors.
+        end
+        return opts
+      end,
+      -- Shared by the manual formatting mapping so routing is evaluated per buffer.
+      format_options = format_options,
+    }
+  '');
 
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/chadrc.lua
   chadRc = toFile "chadrc.lua" ''
@@ -125,7 +215,7 @@
     return {
       {
         "stevearc/conform.nvim",
-        -- event = 'BufWritePre', -- uncomment for format on save
+        ${optionalString cfg.formatting.enable "lazy = false,"}
         opts = require "configs.conform",
       },
 
@@ -186,6 +276,16 @@
       end, diagnostics)
       vim.fn.setreg("+", table.concat(messages, "\n"))
     end, { desc = "Yank line diagnostics to clipboard" })
+
+    ${optionalString cfg.formatting.enable ''
+    vim.keymap.set({ "n", "x" }, "<leader>fm", function()
+      local opts = require("configs.conform").format_options(0)
+      opts.formatters = require("conform").list_formatters_for_buffer(0)
+      require("conform").format(opts)
+    end, { desc = "Format file or selection" })
+    vim.keymap.set("n", "<leader>ft", "<cmd>FormatToggle!<cr>", { desc = "Toggle buffer automatic formatting" })
+    vim.keymap.set("n", "<leader>fT", "<cmd>FormatToggle<cr>", { desc = "Toggle global automatic formatting" })
+    ''}
   '');
 
   options = toFile "options.lua" cfg.vimOptions;
@@ -307,6 +407,7 @@ in
         chmod -R u+w "$CONFIG_DIR"
         cp ${autoCmds} "$CONFIG_DIR"/lua/autocmds.lua
         cp ${chadRc} "$CONFIG_DIR"/lua/chadrc.lua
+        cp ${conformConfig} "$CONFIG_DIR"/lua/configs/conform.lua
         cp ${init} "$CONFIG_DIR"/init.lua
         cp ${initPlugins} "$CONFIG_DIR"/lua/plugins/init.lua
         cp ${lazyLock} "$CONFIG_DIR"/lazy-lock.json
