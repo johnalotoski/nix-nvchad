@@ -278,7 +278,11 @@
         return
       end
 
-      require("vim.ui.clipboard.osc52").copy("+")(lines)
+      local clipboard_lines = vim.list_extend({}, lines)
+      if vim.fn.getregtype(reg) == "V" then
+        table.insert(clipboard_lines, "")
+      end
+      require("vim.ui.clipboard.osc52").copy("+")(clipboard_lines)
       vim.notify(("OSC52Copy: sent %d line(s) from register %s"):format(#lines, reg))
     end, {
       nargs = "?",
