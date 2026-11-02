@@ -6,7 +6,7 @@
   cfg,
 }: let
   inherit (builtins) elem toFile toJSON;
-  inherit (lib) boolToString concatMapStringsSep getExe;
+  inherit (lib) boolToString concatMapStringsSep getExe licenses;
   inherit (pkgs) jq runCommandLocal;
 
   # Sanitize neovim by stripping treesitter parsers to avoid conflicts with lazy-managed parsers
@@ -112,6 +112,9 @@
     require "options"
     require "autocmds"
 
+    -- MOD: To add custom user commands, ex: OSC52Copy
+    require "usercmds"
+
     vim.schedule(function()
       require "mappings"
     end)
@@ -169,9 +172,13 @@
   '';
 
   options = toFile "options.lua" cfg.vimOptions;
+
+  userCommands = toFile "usercmds.lua" cfg.userCommands;
 in
   pkgs.writeShellApplication {
     name = cfg.appName;
+
+    meta.license = licenses.mit;
 
     # Pass the parent environment path to neovim
     inheritPath = true;
@@ -288,6 +295,7 @@ in
         cp ${lazyLock} "$CONFIG_DIR"/lazy-lock.json
         cp ${lspConfig} "$CONFIG_DIR"/lua/configs/lspconfig.lua
         cp ${options} "$CONFIG_DIR"/lua/options.lua
+        cp ${userCommands} "$CONFIG_DIR"/lua/usercmds.lua
 
         # And again, ensure config is writable
         chmod -R u+w "$CONFIG_DIR"
