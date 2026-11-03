@@ -82,9 +82,11 @@
           inherit = false,
           command = settings.treefmtCommand ~= vim.NIL and settings.treefmtCommand or "treefmt",
           -- Stdin paths must be relative to the tree root, including on treefmt 2.4.
+          -- Use cwd for discovery: wrappers may already set --tree-root-file,
+          -- which conflicts with an explicit --tree-root.
           args = function(_, ctx)
             local root = treefmt_root(ctx.buf)
-            return { "--tree-root", root, "--stdin", vim.fs.relpath(root, ctx.filename) }
+            return { "--stdin", vim.fs.relpath(root, ctx.filename) }
           end,
           stdin = true,
           cwd = function(_, ctx) return treefmt_root(ctx.buf) end,
