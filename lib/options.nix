@@ -11,7 +11,7 @@
   ...
 }: let
   inherit (builtins) attrNames elem sort;
-  inherit (lib) concatStringsSep generators mkAfter mkBefore mkOption types unique;
+  inherit (lib) concatStringsSep generators mkAfter mkBefore mkDefault mkOption optionalString types unique;
   inherit (types) attrsOf bool lines listOf package str;
 
   # Upstream ref: https://github.com/NvChad/starter/blob/main/lua/autocmds.lua
@@ -54,17 +54,21 @@
       command = [[2match Tabs /\t\+/]],
     })
 
+    ${optionalString config.formatting.trimTrailingWhitespace ''
     -- Trim trailing whitespace on save
     autocmd("BufWritePre", {
       pattern = "*",
       command = [[%s/\s\+$//e]],
     })
+    ''}
 
+    ${optionalString config.formatting.retab ''
     -- Retab on save
     autocmd("BufWritePre", {
       pattern = "*",
       command = "retab",
     })
+    ''}
 
     -- Start treesitter highlighting explicitly since nvim-treesitter main
     -- branch no longer auto-enables it; this also makes `spell` work in
@@ -100,6 +104,7 @@
     prettier                                 # JS/TS/HTML/CSS/JSON/MD
     shfmt                                    # Shell
     stylua                                   # Lua
+    treefmt                                  # Project formatting policy
 
     # Linters
     shellcheck                               # Shell
@@ -350,8 +355,8 @@ in {
         A default set is included which:
         - Highlights trailing whitespace in LightCoral
         - Highlights tabs in SteelBlue
-        - Trims trailing whitespace on save
-        - Retabs on save
+        - Optionally trims trailing whitespace and retabs on save, controlled
+          by formatting.trimTrailingWhitespace and formatting.retab
         - Starts treesitter highlighting per filetype, enabling `spell` in
           comments and strings via @spell query captures
 
@@ -360,6 +365,78 @@ in {
 
         To override the default autocommands, use `mkForce` in the declaration.
       '';
+    };
+
+    formatting = {
+      enable = mkOption {
+        type = bool;
+        default = true;
+        description = "Enable the generated Conform configuration and formatting toggles.";
+      };
+
+      onSave = mkOption {
+        type = bool;
+        default = true;
+        description = "Initially enable synchronous formatting before saving. Can be toggled in the editor.";
+      };
+
+      timeoutMs = mkOption {
+        type = types.ints.positive;
+        default = 1000;
+        description = "Maximum time in milliseconds to wait for formatting before saving.";
+      };
+
+      preferTreefmt = mkOption {
+        type = bool;
+        default = true;
+        description = ''
+          Prefer treefmt when treefmt.toml or .treefmt.toml is found above the
+          buffer, or when treefmtCommand is explicitly set. Otherwise use
+          formattersByFt, then optionally the LSP. A selected treefmt's
+          exclusions and failures never trigger another formatter.
+        '';
+      };
+
+      treefmtCommand = mkOption {
+        type = types.nullOr str;
+        default = null;
+        example = "treefmt";
+        description = ''
+          Explicit treefmt executable name or absolute path (not a shell command).
+          Set this to use a treefmt-nix wrapper with embedded configuration,
+          even without a TOML file. It runs from the nearest flake.nix or .git
+          root, or the buffer's directory if neither exists. With null, use
+          treefmt from PATH only for projects containing a treefmt TOML file.
+        '';
+      };
+
+      lspFallback = mkOption {
+        type = bool;
+        default = true;
+        description = "Use LSP formatting when no configured external formatter is available, unless treefmt is selected.";
+      };
+
+      formattersByFt = mkOption {
+        type = attrsOf (listOf str);
+        default = {};
+        description = ''
+          Conform formatter names by Neovim filetype, used outside treefmt
+          projects. Multiple formatters run sequentially. Use mkForce to
+          replace the defaults. Formatter executables must be on PATH.
+        '';
+      };
+
+      trimTrailingWhitespace = mkOption {
+        type = bool;
+        default = !config.formatting.enable;
+        description = "Strip trailing whitespace on save independently of Conform. Defaults off when managed formatting is enabled.";
+      };
+
+      retab = mkOption {
+        type = bool;
+        default = !config.formatting.enable;
+        description = "Retab on save independently of Conform. Defaults off when managed formatting is enabled.";
+      };
     };
 
     enableSplash = mkOption {
@@ -612,5 +689,11 @@ in {
     lspServers = mkAfter lspServers;
     userCommands = mkBefore userCommands;
     vimOptions = mkBefore vimOptions;
+    formatting.formattersByFt = {
+      nix = mkDefault ["nixfmt"];
+      lua = mkDefault ["stylua"];
+      python = mkDefault ["black"];
+      sh = mkDefault ["shfmt"];
+    };
   };
 }
